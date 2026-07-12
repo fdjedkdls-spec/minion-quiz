@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<!--
+  ミニオンサバイバーズ 性格診断「あなたはどのミニオン?」
+  ============================================================
+  単一HTMLで完結（外部依存なし）。SNS拡散用のバズ装置。
+
+  ■ 公開手順（GitHub Pages・無料）
+    1. リポジトリの Settings > Pages > Source を「GitHub Actions」に変更（初回のみ）
+    2. main にマージすると .github/workflows/deploy-shindan.yml が
+       このフォルダ（img/ の実キャラ画像込み）を自動デプロイする
+       → https://<owner>.github.io/minion-survivors/
+       ※手動で今すぐ公開したい場合は Actions タブから deploy-shindan を workflow_dispatch
+       ※Netlify Drop（このフォルダをドラッグ&ドロップ）でも可
+    3. 下の CONFIG のストアURLを本物に差し替える
+    ※キャラ画像が読めない環境（単体HTMLだけ開いた場合）はSVGの汎用ミニオンに自動フォールバック
+
+  ■ 告知文サンプル
+    「あなたを24体の一つ目ミニオンに例えると? 10問でわかる #ミニオンサバイバーズ診断
+     → <URL>」
+-->
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>あなたはどのミニオン? | ミニオンサバイバーズ診断</title>
+<meta property="og:title" content="あなたはどのミニオン?【24キャラ性格診断】">
+<meta property="og:description" content="10問でわかる、あなたのミニオンタイプ。全24体の一つ目ミニオンから運命の1体を診断!">
+<!-- og:image は絶対URL必須。独自ドメインやNetlifyで公開する場合は差し替える -->
+<meta property="og:image" content="https://fdjedkdls-spec.github.io/minion-quiz/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<style>
+  :root{
+    --bg:#0a0a14; --panel:#141428; --panel2:#1c1c38; --line:#2e2e58;
+    --cyan:#4dd8ff; --gold:#ffd140; --magenta:#e05ce0; --text:#eaeaf5; --dim:#9a9ac0;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{
+    background:var(--bg); color:var(--text);
+    font-family:"Hiragino Kaku Gothic ProN","Hiragino Sans","Noto Sans JP","Yu Gothic",sans-serif;
+    min-height:100vh; display:flex; justify-content:center;
+    background-image:radial-gradient(ellipse at 50% -10%, #1c1c44 0%, var(--bg) 60%);
+  }
+  .app{width:100%;max-width:480px;padding:24px 20px 48px}
+  header{text-align:center;margin-bottom:20px}
+  .brand{font-size:11px;letter-spacing:.2em;color:var(--cyan);text-transform:uppercase}
+  h1{font-size:24px;margin-top:6px;line-height:1.4}
+  h1 .accent{color:var(--gold)}
+  .sub{color:var(--dim);font-size:13px;margin-top:8px;line-height:1.7}
+  .card{
+    background:var(--panel);border:1px solid var(--line);border-radius:16px;
+    padding:22px;margin-top:18px;box-shadow:0 8px 30px rgba(0,0,0,.45);
+  }
+  .btn{
+    display:block;width:100%;border:none;cursor:pointer;border-radius:12px;
+    padding:15px 16px;font-size:15px;font-weight:700;font-family:inherit;
+    transition:transform .08s ease, filter .15s ease;
+  }
+  .btn:active{transform:scale(.97)}
+  .btn-start{
+    background:linear-gradient(180deg,#ffe37a,var(--gold));color:#3a2a00;
+    font-size:18px;letter-spacing:.15em;box-shadow:0 4px 18px rgba(255,209,64,.35);
+  }
+  .btn-opt{
+    background:var(--panel2);color:var(--text);border:1px solid var(--line);
+    text-align:left;margin-top:10px;font-weight:600;line-height:1.5;
+  }
+  .btn-opt:hover{border-color:var(--cyan);filter:brightness(1.15)}
+  .progress{height:6px;background:var(--panel2);border-radius:3px;overflow:hidden;margin-bottom:14px}
+  .progress > div{height:100%;background:linear-gradient(90deg,var(--cyan),var(--magenta));transition:width .25s ease}
+  .qnum{font-size:12px;color:var(--cyan);letter-spacing:.1em;margin-bottom:6px}
+  .qtext{font-size:17px;font-weight:700;line-height:1.6;margin-bottom:14px}
+  .minion{display:block;margin:0 auto;filter:drop-shadow(0 6px 18px rgba(0,0,0,.5))}
+  .rarity{
+    display:inline-block;font-size:11px;font-weight:700;letter-spacing:.12em;
+    padding:3px 12px;border-radius:99px;border:1px solid;
+  }
+  .r-Common{color:#b9c2cc;border-color:#5c6670;background:#2a3038}
+  .r-Rare{color:#6db8ff;border-color:#2f6db3;background:#12263e}
+  .r-Epic{color:#d78bff;border-color:#8a3fc4;background:#2a1440}
+  .r-Legendary{color:#ffd140;border-color:#b38a1e;background:#3a2c05}
+  .result-name{font-size:30px;font-weight:800;margin:10px 0 2px}
+  .result-en{font-size:12px;color:var(--dim);letter-spacing:.2em;text-transform:uppercase}
+  .catch{color:var(--gold);font-weight:700;font-size:15px;margin:14px 0 8px;line-height:1.6}
+  .desc{font-size:13.5px;color:var(--dim);line-height:1.9}
+  .buddy{
+    margin-top:16px;padding:12px;border-radius:12px;background:var(--panel2);
+    font-size:13px;color:var(--dim);display:flex;align-items:center;gap:12px;
+  }
+  .buddy b{color:var(--text)}
+  .share-x{background:#000;color:#fff;border:1px solid #444;margin-top:20px}
+  .share-copy{background:var(--panel2);color:var(--text);border:1px solid var(--line);margin-top:10px}
+  .store{background:linear-gradient(180deg,#5fe0ff,var(--cyan));color:#00283a;margin-top:10px}
+  .retry{background:none;color:var(--dim);margin-top:16px;font-size:13px;text-decoration:underline;font-weight:400}
+  footer{text-align:center;color:#55557a;font-size:11px;margin-top:28px;line-height:1.8}
+  .hidden{display:none}
+  .fade{animation:fade .3s ease}
+  @keyframes fade{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="brand">MINION SURVIVORS 公式診断</div>
+    <h1>あなたは<span class="accent">どのミニオン</span>?</h1>
+    <div class="sub">10の質問に答えると、全24体の一つ目ミニオンから<br>あなたにそっくりな1体が見つかります。</div>
+  </header>
+
+  <div id="screen-start" class="card fade">
+    <svg class="minion" width="150" height="150" viewBox="0 0 100 100" id="hero-minion"></svg>
+    <p class="sub" style="text-align:center;margin:14px 0 18px">騎士、魔導士、吸血鬼、黄金王……<br>あなたの魂のかたちはどれ?</p>
+    <button class="btn btn-start" onclick="start()">診断スタート</button>
+  </div>
+
+  <div id="screen-q" class="card hidden">
+    <div class="progress"><div id="bar" style="width:0%"></div></div>
+    <div class="qnum" id="qnum"></div>
+    <div class="qtext" id="qtext"></div>
+    <div id="opts"></div>
+  </div>
+
+  <div id="screen-result" class="card hidden" style="text-align:center"></div>
+
+  <footer>
+    ヴァンサバ系ローグライト『ミニオンサバイバーズ』<br>iOS / Android で無料配信中
+  </footer>
+</div>
+
+<script>
+// ===== CONFIG（公開前にここを差し替える）=====
+const CONFIG = {
+  storeUrl: "https://play.google.com/store/apps/details?id=com.fdjed.minionsurvivors", // iOSは分岐しても可
+  hashtag: "#ミニオンサバイバーズ診断",
+};
+
+// ===== キャラデータ（ゲーム内 CharacterData.cs と同期）=====
+// axes: [攻, 守, 金, 魔, 速, 癒, 闇]
+const CHARS = [
+ {n:"兵士", en:"Soldier", r:"Common", c:"#66CCFF", e:"⚔️", v:[2,2,1,1,2,2,0],
+  catch:"「基本こそ最強」の万能バランサー",
+  d:"武器2つを手堅く使い分ける、みんなの最初の相棒タイプ。派手さより確実さ。あなたがいるとチームが安定します。"},
+ {n:"騎士", en:"Knight", r:"Common", c:"#B8BDD1", e:"🛡️", v:[1,5,0,0,0,2,0],
+  catch:"何があっても倒れない、鉄壁の守り人",
+  d:"高HPと鎧、周期バリアで味方の前に立つタンク気質。約束は守るし、締切も守る。頼られると断れないタイプ。"},
+ {n:"魔導士", en:"Mage", r:"Rare", c:"#B873F5", e:"🔮", v:[4,0,0,5,0,0,0],
+  catch:"知識は力。圧倒的火力の探究者",
+  d:"レベルが上がるほど強くなる勉強家。興味のあることへの集中力は誰にも負けない。とんがり帽子が似合います。"},
+ {n:"盗賊", en:"Rogue", r:"Rare", c:"#73D980", e:"🗡️", v:[2,0,4,0,4,0,2],
+  catch:"効率と抜け道を知り尽くした世渡り上手",
+  d:"XPもゴールドも人一倍稼ぐ、要領のよさが武器。最短ルートを見つける嗅覚はチーム一。ちゃっかり者と言われがち。"},
+ {n:"聖職者", en:"Cleric", r:"Rare", c:"#FFF2B3", e:"✨", v:[1,2,0,1,1,5,0],
+  catch:"転んでも立ち上がる、癒やしの実務家",
+  d:"高回復に加えて1度だけ復活できる保険つき。面倒見がよく、失敗してもちゃんとリカバリーする現実的な優しさの持ち主。"},
+ {n:"吸血鬼", en:"Vampire", r:"Epic", c:"#D1404D", e:"🦇", v:[4,1,1,3,2,0,4],
+  catch:"戦うほど元気になる夜型のカリスマ",
+  d:"敵を倒すたびに回復する、修羅場でこそ輝くタイプ。夜になるとテンションが上がる心当たり、ありませんか?"},
+ {n:"狂戦士", en:"Berserker", r:"Epic", c:"#D94733", e:"🪓", v:[5,0,0,0,3,0,2],
+  catch:"追い込まれてからが本番の火事場番長",
+  d:"ピンチになるほど火力が上がる(最大+130%)逆境体質。普段はのんびり、締切前夜に覚醒する天才肌です。"},
+ {n:"時の魔女", en:"Chronomancer", r:"Epic", c:"#8CCCF2", e:"⏳", v:[1,3,0,5,0,1,0],
+  catch:"世界のスピードを自分で決めるマイペースの極み",
+  d:"周囲を鈍化させ、自分のリズムで戦う時間操作系。流行に流されず、自分の時計で生きるあなたにぴったり。"},
+ {n:"黄金王", en:"Midas", r:"Legendary", c:"#FFD140", e:"👑", v:[2,1,5,1,0,0,0],
+  catch:"稼げば稼ぐほど強くなる、生粋の実業家",
+  d:"ゴールドが力に変わる(最大+160%)拝金…もとい合理主義の王。目標を数字で語れるタイプ。将来きっと大物です。"},
+ {n:"狩人", en:"Hunter", r:"Rare", c:"#8CBF73", e:"🏹", v:[3,0,1,0,4,1,0],
+  catch:"獲物は逃さない、静かなる俊足スナイパー",
+  d:"二刀流+俊足で獲物を追い詰めるアウトドア派。集中すると周りが見えなくなるほどの没入力が武器です。"},
+ {n:"武僧", en:"Monk", r:"Rare", c:"#F2AD59", e:"👊", v:[1,4,0,1,1,3,0],
+  catch:"心も体も鍛え抜かれた無敵のルーティン人間",
+  d:"鉄壁と高回復、規則正しさが強さの源。朝活・筋トレ・瞑想…続ける力なら24体で一番。拳と心は裏切りません。"},
+ {n:"死霊術師", en:"Necromancer", r:"Epic", c:"#73F2A6", e:"💀", v:[3,0,1,4,0,0,5],
+  catch:"闇の知識を操る、深夜テンションの研究者",
+  d:"幽炎で焼き、魂を吸収する攻防一体のダークキャスター。人と違う道を選ぶことに迷いがない、孤高のこだわり派。"},
+ {n:"聖騎士", en:"Paladin", r:"Epic", c:"#F2EBBF", e:"✝️", v:[2,5,0,1,0,3,0],
+  catch:"最硬の盾で仲間を守る正義の人",
+  d:"全キャラ最硬のHPとアーマー、最速の盾。曲がったことが嫌いで、困っている人を放っておけない生粋のヒーローです。"},
+ {n:"嵐の魔女", en:"Tempest", r:"Epic", c:"#A6D9FF", e:"⚡", v:[4,0,0,4,3,0,0],
+  catch:"思い立ったら雷速。感性で生きるスピード魔法使い",
+  d:"超連射の雷撃で駆け抜ける直感型。ひらめいたら即行動、迷っている時間がもったいない。周りはついてくるのに必死。"},
+ {n:"星詠み", en:"Astromancer", r:"Legendary", c:"#CCB3FF", e:"🌌", v:[2,1,1,5,1,2,0],
+  catch:"すべてを見通す、成長速度おばけの賢者",
+  d:"XP+60%で誰よりも速く完成する全能型。好奇心の塊で、気づけば何でもそこそこ以上にできてしまう器用な天才。"},
+ {n:"見習い剣士", en:"Squire", r:"Common", c:"#BFD1E6", e:"🌱", v:[2,1,0,0,1,3,0],
+  catch:"伸びしろしかない、まっすぐな努力家",
+  d:"特別な力はまだない。でも素直さと堅実さは本物。周りが応援したくなる人柄こそ、実は最強のスキルです。"},
+ {n:"行商人", en:"Merchant", r:"Common", c:"#D9B373", e:"🎒", v:[0,1,5,0,1,3,0],
+  catch:"みんなを笑顔にする人たらしの商売人",
+  d:"ゴールド+25%と広い回収範囲。戦うより「つながり」で生きるタイプ。あなたの人脈、実は資産です。"},
+ {n:"炎術士", en:"Pyromancer", r:"Rare", c:"#FF804D", e:"🔥", v:[4,0,0,3,1,0,1],
+  catch:"燃え上がったら止まらない情熱の人",
+  d:"レベルごとに火力が伸び続ける、熱しやすく冷めにくい情熱家。好きなものの話になると早口になるでしょう?"},
+ {n:"影走り", en:"Shade", r:"Rare", c:"#737399", e:"🌫️", v:[2,0,1,1,5,0,3],
+  catch:"誰よりも速く、誰にも気づかれずに",
+  d:"全キャラ最速の脚で戦場を舞う隠密。大人数の集まりよりも、少数の信頼できる相手と深く付き合う静かな実力者。"},
+ {n:"森の巫女", en:"Druid", r:"Rare", c:"#8CD973", e:"🌿", v:[0,1,0,3,0,5,0],
+  catch:"そばにいるだけで癒やされる自然体の人",
+  d:"高回復と撃破回復で味方を支える森のヒーラー。争いは苦手だけど、あなたの周りだけいつも空気が柔らかい。"},
+ {n:"鬼武者", en:"Oni", r:"Epic", c:"#E65959", e:"👹", v:[5,3,0,0,1,0,2],
+  catch:"斧と鞭の二刀流。豪快さは天下一品",
+  d:"高火力と頑丈さを兼ね備えた和の猛者。細かいことは気にしない親分肌で、宴会では間違いなく中心にいるタイプ。"},
+ {n:"聖女", en:"Saint", r:"Epic", c:"#FFE6D9", e:"😇", v:[0,4,0,2,0,5,0],
+  catch:"2度倒れても3度立つ、慈愛の化身",
+  d:"なんと2回復活する聖属性の頂点。どんな失敗も許し、どんな人にも優しい。あなたの存在自体がチームの回復薬。"},
+ {n:"竜騎士", en:"Dragoon", r:"Legendary", c:"#F28C33", e:"🐉", v:[4,3,0,1,2,1,0],
+  catch:"攻守走そろった生まれながらのエース",
+  d:"火杖と斧の二刀流に竜の膂力。何をやらせても高水準で、気づけばリーダーを任されている。本人は意外と謙虚。"},
+ {n:"虚空の王", en:"Voidlord", r:"Legendary", c:"#8059BF", e:"🕳️", v:[3,2,1,4,0,0,4],
+  catch:"すべてを呑み込む静かなる野心家",
+  d:"強スロウ+高火力+高HP、隙のない闇の王。多くを語らないが、心の中には誰より大きな野望が渦巻いています。"},
+];
+
+// ===== 質問（各選択肢が軸に加点: [攻,守,金,魔,速,癒,闇]）=====
+const QUESTIONS = [
+ {q:"ゲームで大群に囲まれた。最初にどうする?", o:[
+   ["真正面から突っ込む",[3,0,0,0,0,0,0]],
+   ["壁を背にして迎え撃つ",[0,3,0,0,0,0,0]],
+   ["走って距離を取り、様子を見る",[0,0,0,0,3,0,0]],
+   ["範囲魔法で一掃できないか考える",[0,0,0,3,0,0,0]]]},
+ {q:"宝箱を発見! 中身の理想は?", o:[
+   ["伝説の武器",[2,0,0,0,0,0,0]],
+   ["壊れない鎧",[0,2,0,0,0,0,0]],
+   ["ぎっしりのゴールド",[0,0,3,0,0,0,0]],
+   ["読めない文字の魔導書",[0,0,0,2,0,0,1]]]},
+ {q:"友達からよく言われる印象は?", o:[
+   ["熱い・エネルギッシュ",[2,0,0,0,0,0,0]],
+   ["頼れる・安心する",[0,2,0,0,0,1,0]],
+   ["要領がいい・ちゃっかりしてる",[0,0,2,0,1,0,0]],
+   ["ミステリアス・何考えてるか不明",[0,0,0,1,0,0,2]]]},
+ {q:"締切前夜。あなたの状態は?", o:[
+   ["追い込まれて覚醒している",[2,0,0,0,0,0,1]],
+   ["計画通り、もう終わっている",[0,3,0,0,0,0,0]],
+   ["最短で終わらせる抜け道を発見",[0,0,1,0,2,0,0]],
+   ["なぜか急にひらめいて一瞬で終わる",[0,0,0,3,0,0,0]]]},
+ {q:"パーティを組むなら、あなたの役割は?", o:[
+   ["先頭で暴れるアタッカー",[3,0,0,0,0,0,0]],
+   ["みんなを守るタンク",[0,3,0,0,0,0,0]],
+   ["支えて癒やすヒーラー",[0,0,0,0,0,3,0]],
+   ["神出鬼没の遊撃手",[0,0,1,0,2,0,0]]]},
+ {q:"道端に100円玉が落ちていた。", o:[
+   ["拾って募金箱へ",[0,0,0,0,0,2,0]],
+   ["ありがたく拾う。塵も積もれば山となる",[0,0,3,0,0,0,0]],
+   ["考えごとをしていて気づかない",[0,0,0,2,1,0,0]],
+   ["交番に届ける。ルールはルール",[0,2,0,0,0,0,0]]]},
+ {q:"いちばん好きな時間帯は?", o:[
+   ["太陽が真上の正午",[1,0,0,0,0,2,0]],
+   ["始まりの朝",[0,2,0,0,1,0,0]],
+   ["黄金色の夕方",[0,0,2,1,0,0,0]],
+   ["すべてが静まる深夜",[0,0,0,1,0,0,2]]]},
+ {q:"大ピンチ! 心の中のつぶやきは?", o:[
+   ["「……むしろ燃えてきた」",[2,0,0,0,0,0,1]],
+   ["「耐えろ。耐えれば勝てる」",[0,3,0,0,0,0,0]],
+   ["「みんなだけは守らなきゃ」",[0,1,0,0,0,2,0]],
+   ["「逃げるが勝ち、また明日」",[0,0,0,0,3,0,0]]]},
+ {q:"気になる新作ゲームが出た!", o:[
+   ["何も調べずとりあえず遊ぶ",[2,0,0,0,1,0,0]],
+   ["レビューを読み込んでから決める",[0,2,0,1,0,0,0]],
+   ["限定版を最速で予約する",[0,0,3,0,0,0,0]],
+   ["攻略とシステムを調べ尽くす",[0,0,0,3,0,0,0]]]},
+ {q:"もし物語の登場人物なら、理想の結末は?", o:[
+   ["大群のど真ん中で伝説になる",[2,0,0,0,0,0,1]],
+   ["最後のひとりまで立ち続ける",[0,2,0,0,0,0,0]],
+   ["仲間全員を生きて帰らせる",[0,0,0,0,0,3,0]],
+   ["誰にも気づかれず、静かに生還する",[0,0,0,0,2,0,1]]]},
+];
+
+// ===== 診断ロジック =====
+let qi = 0;
+let scores = [0,0,0,0,0,0,0];
+
+const $ = id => document.getElementById(id);
+
+// 実キャラ画像（img/<EN>.webp）。単体HTMLで開くなど画像が無い環境ではSVGにフォールバック
+function minionImg(c, size){
+  return `<img class="minion" src="img/${c.en}.webp" width="${size}" height="${size}" alt="${c.n}" onerror="imgFail(this,'${c.c}',${size})">`;
+}
+function imgFail(el, color, size){
+  const span = document.createElement("span");
+  span.innerHTML = minionSVG(color, size);
+  el.replaceWith(span.firstElementChild);
+}
+
+function minionSVG(color, size){
+  // ゲームの一つ目ミニオンを模したSVG（丸いスライム+大きな一つ目+短い手足）
+  return `<svg class="minion" width="${size}" height="${size}" viewBox="0 0 100 100">
+    <ellipse cx="50" cy="93" rx="26" ry="5" fill="#000" opacity=".35"/>
+    <path d="M50 12 C 74 12 88 34 88 56 C 88 78 72 90 50 90 C 28 90 12 78 12 56 C 12 34 26 12 50 12 Z" fill="${color}" stroke="#101020" stroke-width="3"/>
+    <path d="M50 12 C 60 12 70 18 76 28 C 62 20 46 18 34 24 C 38 17 44 12 50 12 Z" fill="#fff" opacity=".22"/>
+    <ellipse cx="24" cy="70" rx="7" ry="9" fill="${color}" stroke="#101020" stroke-width="3"/>
+    <ellipse cx="76" cy="70" rx="7" ry="9" fill="${color}" stroke="#101020" stroke-width="3"/>
+    <circle cx="50" cy="50" r="19" fill="#fff" stroke="#101020" stroke-width="3"/>
+    <circle cx="50" cy="52" r="10" fill="#1a2a6e"/>
+    <circle cx="50" cy="52" r="5" fill="#000"/>
+    <circle cx="46" cy="47" r="3.5" fill="#fff"/>
+    <ellipse cx="40" cy="94" rx="8" ry="4.5" fill="${color}" stroke="#101020" stroke-width="3"/>
+    <ellipse cx="60" cy="94" rx="8" ry="4.5" fill="${color}" stroke="#101020" stroke-width="3"/>
+  </svg>`;
+}
+
+function start(){
+  qi = 0; scores = [0,0,0,0,0,0,0];
+  $("screen-start").classList.add("hidden");
+  $("screen-result").classList.add("hidden");
+  $("screen-q").classList.remove("hidden");
+  renderQ();
+}
+
+function renderQ(){
+  const q = QUESTIONS[qi];
+  $("bar").style.width = (qi / QUESTIONS.length * 100) + "%";
+  $("qnum").textContent = `Q${qi+1} / ${QUESTIONS.length}`;
+  $("qtext").textContent = q.q;
+  const opts = $("opts");
+  opts.innerHTML = "";
+  q.o.forEach(([label, w]) => {
+    const b = document.createElement("button");
+    b.className = "btn btn-opt fade";
+    b.textContent = label;
+    b.onclick = () => answer(w);
+    opts.appendChild(b);
+  });
+}
+
+function answer(w){
+  w.forEach((v,i)=>scores[i]+=v);
+  qi++;
+  if(qi < QUESTIONS.length) renderQ();
+  else showResult();
+}
+
+function ranked(){
+  return CHARS.map(c => {
+    const norm = Math.hypot(...c.v) || 1;
+    const dot = c.v.reduce((s,v,i)=>s + v*scores[i], 0);
+    return {c, s: dot / norm};
+  }).sort((a,b)=>b.s-a.s);
+}
+
+function showResult(){
+  const [top, second] = ranked();
+  const c = top.c;
+  const el = $("screen-result");
+  el.innerHTML = `
+    <div class="sub" style="letter-spacing:.15em">あなたのミニオンタイプは……</div>
+    ${minionImg(c, 170)}
+    <div class="result-name">${c.e} ${c.n}</div>
+    <div class="result-en">${c.en}</div>
+    <div style="margin-top:10px"><span class="rarity r-${c.r}">${c.r.toUpperCase()}</span></div>
+    <div class="catch">${c.catch}</div>
+    <div class="desc" style="text-align:left">${c.d}</div>
+    <div class="buddy">${minionImg(second.c, 44)}
+      <span>気が合う仲間: <b>${second.c.e} ${second.c.n}</b>（2番目に近いタイプ）</span></div>
+    <button class="btn share-x" onclick="shareX('${c.n}')">𝕏 で結果をシェア</button>
+    <button class="btn share-copy" onclick="copyResult('${c.n}')">結果をコピー</button>
+    <a class="btn store" style="text-decoration:none" href="${CONFIG.storeUrl}" target="_blank" rel="noopener">🎮 ${c.n}を使ってみる（無料）</a>
+    <button class="btn retry" onclick="start()">もう一度診断する</button>
+  `;
+  $("screen-q").classList.add("hidden");
+  el.classList.remove("hidden");
+  el.classList.add("fade");
+}
+
+function shareText(name){
+  return `私のミニオンタイプは「${name}」でした!\nあなたはどのミニオン? 10問で診断→ ${location.href}\n${CONFIG.hashtag}`;
+}
+function shareX(name){
+  window.open("https://twitter.com/intent/tweet?text=" + encodeURIComponent(shareText(name)), "_blank");
+}
+function copyResult(name){
+  navigator.clipboard.writeText(shareText(name)).then(()=>alert("コピーしました!"));
+}
+
+// トップ画面のミニオン（兵士）
+$("hero-minion").outerHTML = minionImg(CHARS[0], 150);
+</script>
+</body>
+</html>
